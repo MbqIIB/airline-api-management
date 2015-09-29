@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policy online="true" id="{{policyId}}" policyName="Throttling SLA Based"
+	xmlns="http://www.mulesoft.org/schema/mule/policy" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:throttling-gw="http://www.mulesoft.org/schema/mule/throttling-gw"
+	xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+	xmlns:mule="http://www.mulesoft.org/schema/mule/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	 xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/policy http://www.mulesoft.org/schema/mule/policy/current/mule-policy.xsd
+		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+        http://www.mulesoft.org/schema/mule/throttling-gw http://www.mulesoft.org/schema/mule/throttling-gw/current/mule-throttling-gw.xsd
+        http://www.mulesoft.org/schema/mule/api-platform-gw http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+        http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+ ">
+
+	<mule:expression-filter expression="#[rateLimitingCondition == false]" name="RateLimitingExpressionFilter"/>
+	<mule:processor-chain name="policyViolation">
+    	<mule:set-property propertyName="http.status" value="403"/>
+        <mule:set-property propertyName="Content-Type" value="application/json"/>
+        <mule:set-payload value='{"message" : "API access its restricted due to look2book policy"}'/>
+  	</mule:processor-chain>
+  	
+	<before>
+		<mule:set-variable variableName="originalPayload" value="#[payload]" />
+
+		<!-- http://look2book.cloudhub.io/l2b-ratios/search?customerId=FD2823 -->
+		<mule:logger message="Configuration Parameter -> look2bookAPIHost = {{ look2bookAPIHost }}" level="INFO" />
+		<mule:logger message="Configuration Parameter -> customerId = #[message.inboundProperties['customerId']]" level="INFO" />
+		<mule:logger message="Configuration Parameter -> bookingRatioLimit = {{ bookingRatioLimit }}" level="INFO" />
+
+		<mule:enricher target="flowVars['bookingRatio']">
+		  <mule:processor-chain>
+			<http:outbound-endpoint exchange-pattern="request-response" responseTimeout="100000" method="GET" address="http://{{ look2bookAPIHost }}/l2b-ratios/search?customerId=#[message.inboundProperties['customerId']]" />
+	        <mule:logger message="Look2Book API Response -> #[payload:java.lang.String]" level="INFO" />
+	        <mule:set-variable variableName="currentLookups" value="#[json:currentLookups]"  />
+	        <mule:set-variable variableName="currentBookings" value="#[json:currentBookings]" />
+	        <mule:expression-component><![CDATA[if (Integer.valueOf(currentBookings).equals(0)) {
+	 			currentBookings=1;
+	 		}]]></mule:expression-component>
+	        <mule:set-payload value="#[Integer.valueOf(currentLookups)/Integer.valueOf(currentBookings)]" />
+		  </mule:processor-chain>
+		</mule:enricher>		
+
+		<mule:set-variable variableName="rateLimitingCondition" value="#[bookingRatio >= {{ bookingRatioLimit }}]" />
+        <mule:logger message="Booking Ration is #[bookingRatio]" level="INFO" />
+        <mule:logger message="Rate limiting condition is #[rateLimitingCondition]" level="INFO" />
+
+		<mule:message-filter onUnaccepted="policyViolation">
+			<mule:filter ref="RateLimitingExpressionFilter" />
+	    </mule:message-filter>	        
+		
+		<!-- Restore original payload and headers -->
+		<mule:set-payload value="#[flowVars['originalPayload']]" />
+
+		<!-- Cleanup -->
+        <mule:remove-variable variableName="look2bookResponse"  />
+        <mule:remove-variable variableName="currentLookups"  />
+        <mule:remove-variable variableName="currentBookings" />
+        <mule:remove-variable variableName="bookingRatio" />
+        <mule:remove-variable variableName="rateLimitingCondition" />
+		<mule:remove-variable variableName="originalPayload" />
+	</before>
+
+	<pointcut>
+		<api-platform-gw:api-pointcut apiName="{{apiName}}" apiVersion="{{apiVersionName}}" />
+	</pointcut>
+
+</policy>

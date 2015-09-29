@@ -1,0 +1,31 @@
+id: ratelimit-look2book-based
+name: Rate Limit - Look 2 Book based
+description: Specifies the maximum value for the number of messages processed per time period, and rejects any messages beyond the maximum. Applies rate limiting to all API calls, regardless of the source.
+category: Quality of service
+type: system
+standalone: true
+gatewayCompatibility: '>=1.0.0'
+requiresConnectivity: false
+providedCharacteristics:
+  - Baseline Rate Limiting
+requiredCharacteristics: []
+configuration:
+  - propertyName: look2bookAPIHost
+    name: Look2Book API Host
+    description: The Look2Book API host without http
+    type: string
+    optional: false
+    defaultValue: look2book.cloudhub.io
+    sensitive: false
+    allowMultiple: false
+  - propertyName: bookingRatioLimit
+    name: Look2Book Ratio limit
+    description: The Look2Book Ratio limit. When the look2book ration is greater than the list 
+    type: int
+    optional: false
+    defaultValue: 500
+    minimumValue: 1
+    maximumValue: 2147483647
+    sensitive: false
+    allowMultiple: false
+    
