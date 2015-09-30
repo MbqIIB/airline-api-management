@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd">
+    <objectstore:config name="ObjectStore__Configuration" doc:name="ObjectStore: Configuration"/>
+    <flow name="add-booking-event">
+        <flow-ref name="booking-event-variable" doc:name="booking-event-variable"/>
+        <flow-ref name="objectstore-logic" doc:name="objectstore-logic"/>
+    </flow>
+    <flow name="add-look-up-event">
+        <flow-ref name="look-up-event-variable" doc:name="look-up-event-variable"/>
+        <flow-ref name="objectstore-logic" doc:name="objectstore-logic"/>
+    </flow>
+    <sub-flow name="booking-event-variable">
+        <set-variable variableName="key" value="#[payload+'-booking']" doc:name="Variable"/>
+    </sub-flow>
+    <sub-flow name="look-up-event-variable">
+        <set-variable variableName="key" value="#[payload+'-lookup']" doc:name="Variable"/>
+    </sub-flow>
+    <flow name="get-ratio">
+        <set-variable variableName="customerid" value="#[payload]" doc:name="Save customer Id"/>
+        <flow-ref name="booking-event-variable" doc:name="booking-event-variable"/>
+        <objectstore:retrieve config-ref="ObjectStore__Configuration" key="#[flowVars.key]" defaultValue-ref="#[0]" targetProperty="bookings" doc:name="Obtain Bookings Amount for client"/>
+        <set-payload value="#[flowVars.customerid]" doc:name="Set Payload"/>
+        <flow-ref name="look-up-event-variable" doc:name="look-up-event-variable"/>
+        <objectstore:retrieve config-ref="ObjectStore__Configuration" key="#[flowVars.key]" defaultValue-ref="#[0]" targetProperty="lookups" doc:name="Obtain Lookup Amount for client"/>
+    </flow>
+    <flow name="objectstore-logic">
+        <objectstore:retrieve-with-lock config-ref="ObjectStore__Configuration" key="#[flowVars.key]" defaultValue-ref="#[Integer.valueOf(0)]" doc:name="Retrieve current value with lock"/>
+        <objectstore:store config-ref="ObjectStore__Configuration" key="#[flowVars.key]" value-ref="#[Integer.valueOf(payload) + 1]" overwrite="true" doc:name="ObjectStore"/>
+    </flow>
+</mule>

@@ -1,0 +1,27 @@
+#%RAML 0.8
+title: Look2Book
+version: 1
+baseUri: http://look-2-book.cloudhub.io/api/
+
+/l2b-ratios:
+  /search:
+    get:
+      queryParameters:
+        customerId:
+          type: string
+          required: true
+          example: FD2823
+      responses:
+        200:
+          body:
+            application/json:
+              example: |
+                {
+                  "customer": "FD2923",
+                  "currentLookups": 455,
+                  "currentBookings": 2
+                }
+/events/lookup/{customerId}:
+  post:
+/events/booking/{customerId}:
+  post:

@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://jsonschema.net",
+  "type": "object",
+  "properties": {
+    "customer": {
+      "id": "http://jsonschema.net/customer",
+      "type": "string"
+    },
+    "currentLookups": {
+      "id": "http://jsonschema.net/currentLookups",
+      "type": "integer"
+    },
+    "currentBookings": {
+      "id": "http://jsonschema.net/currentBookings",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "customer",
+    "currentLookups",
+    "currentBookings"
+  ]
+}
