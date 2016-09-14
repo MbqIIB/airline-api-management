@@ -31,7 +31,7 @@ http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/m
         <objectstore:retrieve config-ref="ObjectStore__Configuration" key="#[flowVars.key]" defaultValue-ref="#[0]" targetProperty="lookups" doc:name="Obtain Lookup Amount for client"/>
     </flow>
     <flow name="objectstore-logic">
-        <objectstore:retrieve-with-lock config-ref="ObjectStore__Configuration" key="#[flowVars.key]" defaultValue-ref="#[Integer.valueOf(0)]" doc:name="Retrieve current value with lock"/>
+        <objectstore:retrieve config-ref="ObjectStore__Configuration" doc:name="Retrieve current value or 0 if not set" key="#[flowVars.key]" defaultValue-ref="#[Integer.valueOf(0)]"/>
         <objectstore:store config-ref="ObjectStore__Configuration" key="#[flowVars.key]" value-ref="#[Integer.valueOf(payload) + 1]" overwrite="true" doc:name="ObjectStore"/>
     </flow>
 </mule>
