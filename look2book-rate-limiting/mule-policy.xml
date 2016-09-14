@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<mule-policy xmlns="http://www.mulesoft.com/tooling/project" runtimeId="org.mule.tooling.server.3.8.1.ee" schemaVersion="5.3.0.0">
+    <name>look2book-rate-limiting</name>
+    <description></description>
+    <xmlFileName>look2book-rate-limiting.xml</xmlFileName>
+    <yamlFileName>look2book-rate-limiting.yaml</yamlFileName>
+</mule-policy>

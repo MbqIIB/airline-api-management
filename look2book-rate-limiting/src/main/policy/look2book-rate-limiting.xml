@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policy xmlns="http://www.mulesoft.org/schema/mule/policy"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:spring="http://www.springframework.org/schema/beans"
+        xmlns:mule="http://www.mulesoft.org/schema/mule/core"
+        xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
+        xmlns:ss="http://www.springframework.org/schema/security"
+        xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+        xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+        xsi:schemaLocation="http://www.mulesoft.org/schema/mule/policy http://www.mulesoft.org/schema/mule/policy/current/mule-policy.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+              http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/schema/mule/spring-security/current/mule-spring-security.xsd
+              http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-current.xsd
+              http://www.mulesoft.org/schema/mule/api-platform-gw http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+              http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+              http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <!--
+        This is a custom policy example to help you get started.
+        It's a policy that filters HTTP requests based on a MEL expression.
+
+        The policy has two configuration parameters (see the YAML file):
+        - query: a MEL expression to determine which messages to filter.
+        - denied-message: a message to display in the response when the
+          filter is applied.
+
+        For more information about creating custom policies see:
+        https://docs.mulesoft.com/api-manager/creating-a-policy-walkthrough
+        and
+        https://docs.mulesoft.com/api-manager/applying-custom-policies
+    -->
+
+    <!--
+        A pointcut controls the scope of a policy application. You can use
+        different types of conditions to determine if the policy must be
+        applied.
+
+        api-platform-gw:api-pointcut: Applies the policy to a particular API.
+        apiName/apiVersion values are compared against the auto-discovery
+        global element defined in your Mule project.
+        See: https://docs.mulesoft.com/api-manager/api-auto-discovery
+
+        For other kinds of pointcut conditions see: 
+        https://docs.mulesoft.com/api-manager/applying-custom-policies
+    -->
+    <pointcut>
+        <!--
+            This file is a policy template, in the final XML deployed to Mule
+            the names surrounded by double bracket will be replaced with
+            configuration parameters.
+        -->
+        <api-platform-gw:api-pointcut apiName="{{ apiName }}" apiVersion="{{ apiVersionName }}"/>
+    </pointcut>
+
+    <!-- 
+        The before tag executes before your API flows. In this tag you can
+        filter or manipulate the incoming message.
+    -->
+	<mule:expression-filter expression="#[rateLimitingCondition == false]" name="RateLimitingExpressionFilter"/>
+	<mule:processor-chain name="policyViolation">
+    	<mule:set-property propertyName="http.status" value="403"/>
+        <mule:set-property propertyName="Content-Type" value="application/json"/>
+        <mule:set-payload value='{"message" : "API access its restricted due to look2book policy"}'/>
+  	</mule:processor-chain>
+  	
+	<before>
+		<mule:set-variable variableName="originalPayload" value="#[payload]" />
+
+		<!-- http://look2book.cloudhub.io/l2b-ratios/search?customerId=FD2823 -->
+		<mule:logger message="Configuration Parameter -> look2bookAPIHost = {{ look2bookAPIHost }}" level="INFO" />
+		<mule:logger message="Configuration Parameter -> customerId = #[message.inboundProperties['customerId']]" level="INFO" />
+		<mule:logger message="Configuration Parameter -> bookingRatioLimit = {{ bookingRatioLimit }}" level="INFO" />
+
+		<!-- Make the HTTP Call to Look2Book me API -->
+        <scripting:transformer>
+            <scripting:script engine="Groovy">
+                <![CDATA[
+                	import org.json.JSONObject
+                
+					URL url = new URL("http://{{ look2bookAPIHost }}/l2b-ratios/search?customerId=" + message.getInboundProperty("customerId"));
+					URLConnection urlConnection = url.openConnection();
+					BufferedReader reader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+					StringBuffer response = new StringBuffer();
+					String inputLine;
+					while ((inputLine = reader.readLine()) != null)
+					{
+					    response.append(inputLine)
+					}
+					reader.close();
+					
+					def object = new JSONObject(response.toString())
+					if (Integer.valueOf(object.currentBookings).equals(0)) {
+							object.currentBookings=1;
+					}
+                    message.setInvocationProperty("look2bookResponse", response.toString());
+                    message.setInvocationProperty("currentLookups", object.currentLookups);
+                    message.setInvocationProperty("currentBookings", object.currentBookings);
+                ]]>
+            </scripting:script>
+        </scripting:transformer>
+
+        <mule:logger message="Look2Book API Response -> #[look2bookResponse]" level="INFO" />
+        <mule:set-variable variableName="bookingRatio" value="#[Integer.valueOf(currentLookups)/Integer.valueOf(currentBookings)]" />
+		<mule:set-variable variableName="rateLimitingCondition" value="#[bookingRatio >= {{ bookingRatioLimit }}]" />
+
+        <mule:logger message="Booking Ration is #[bookingRatio]" level="INFO" />
+        <mule:logger message="Rate limiting condition is #[rateLimitingCondition]" level="INFO" />
+
+		<mule:message-filter onUnaccepted="policyViolation">
+			<mule:filter ref="RateLimitingExpressionFilter" />
+	    </mule:message-filter>	        
+		
+		<!-- Restore original payload and headers -->
+		<mule:set-payload value="#[flowVars['originalPayload']]" />
+
+		<!-- Cleanup -->
+        <mule:remove-variable variableName="look2bookResponse"  />
+        <mule:remove-variable variableName="currentLookups"  />
+        <mule:remove-variable variableName="currentBookings" />
+        <mule:remove-variable variableName="bookingRatio" />
+        <mule:remove-variable variableName="rateLimitingCondition" />
+		<mule:remove-variable variableName="originalPayload" />
+	</before>
+
+    <mule:processor-chain name="policyViolation">
+        <mule:logger message="The custom policy filtered the message #[message.getId()] based on a MEL query" level="DEBUG" />
+        <mule:set-property propertyName="http.status" value="403"/>
+        <mule:set-property propertyName="Content-Type" value="application/json"/>
+        <mule:set-payload value='{ "error" : "Custom Policy: {{ denied-message }}"}'/>
+    </mule:processor-chain>
+</policy>

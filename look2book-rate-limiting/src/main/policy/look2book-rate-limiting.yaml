@@ -1,0 +1,54 @@
+#
+# This is an example of a Custom Policy Definition file.
+# This file is used by API Platform to:
+# - Auto-generate a configuration UI for your custom policy.
+# - Determine policy dependencies
+#
+# See: https://docs.mulesoft.com/api-manager/applying-custom-policies#policy-definition 
+
+# Name used to describe the policy in API Platform
+name: Rate Limit - Look 2 Book based
+
+# A more detailed description of the policy
+description: Specifies the maximum value for the number of messages processed per time period, and rejects any messages beyond the maximum. Applies rate limiting to all API calls, regardless of the source.
+
+# Category is just a plain text used in API Platform to list policies
+category: Quality of service
+
+# True if the policy can work on its own or false if the policy can be 
+# applied only as part of another policy.
+standalone: true
+
+# A list of strings that describes characteristics provided by this policy.
+# API Platform uses an indirect dependency mechanisms: policies can provide
+# or require characteristics, the platform will inform you about requirements
+# but it will not force you to use a particular policy
+providedCharacteristics: [Baseline Rate Limiting]
+requiredCharacteristics: []
+
+
+id: ratelimit-look2book-based
+type: system
+gatewayCompatibility: '>=1.0.0'
+requiresConnectivity: false
+
+# This defines custom configuration parameters for your policy template
+configuration:
+  - propertyName: look2bookAPIHost
+    name: Look2Book API Host
+    description: The Look2Book API host without http
+    type: string
+    optional: false
+    defaultValue: look2book.cloudhub.io
+    sensitive: false
+    allowMultiple: false
+  - propertyName: bookingRatioLimit
+    name: Look2Book Ratio limit
+    description: The Look2Book Ratio limit. When the look2book ration is greater than the list 
+    type: int
+    optional: false
+    defaultValue: 500
+    minimumValue: 1
+    maximumValue: 2147483647
+    sensitive: false
+    allowMultiple: false
